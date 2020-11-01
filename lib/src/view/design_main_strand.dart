@@ -411,10 +411,11 @@ Future<void> ask_for_add_modification(Strand strand,
       (is_5p != null && domain == null && address == null));
   bool is_end = is_5p != null;
   int strand_dna_idx = null;
-  int selected_index = 2;
+  int selected_index = 2; // default to internal mod
   if (!is_end) {
     strand_dna_idx = clicked_strand_dna_idx(domain, address, strand);
   } else {
+    // but if user clicked on 5' or 3' end, use that as default
     if (is_5p) {
       selected_index = 1;
     } else {
@@ -437,11 +438,19 @@ Future<void> ask_for_add_modification(Strand strand,
       DialogInteger(label: 'index of DNA base', value: is_end ? 0 : strand_dna_idx);
 
   // don't allow to modify index of DNA base when 3' or 5' is selected
-  var dialog = Dialog(title: 'add modification', items: items, disable_when_any_radio_button_selected: {
-    index_of_dna_base_idx: {
-      modification_type_idx: ["3'", "5'"]
-    },
-  });
+  // set key for cached responses based on 3', 5', internal
+  var key_map = {0: "3'", 1: "5'", 2: "internal"};
+  assert(key_map.containsKey(selected_index));
+  var dialog = Dialog(
+      title: 'add modification',
+      use_prev_responses: true,
+      prev_responses_key: 'add modification ${key_map[selected_index]}',
+      items: items,
+      disable_when_any_radio_button_selected: {
+        index_of_dna_base_idx: {
+          modification_type_idx: ["3'", "5'"]
+        },
+      });
 
   List<DialogItem> results = await util.dialog(dialog);
   if (results == null) return;

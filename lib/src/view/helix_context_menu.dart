@@ -167,22 +167,16 @@ List<ContextMenuItem> context_menu_helix(Helix helix, bool helix_change_apply_to
     items[apply_to_some_idx] = DialogCheckbox(label: 'apply to some', value: helix_change_apply_to_all);
     items[apply_to_some_helices_idx] = DialogText(label: 'helices (space-separated)', value: "");
 
-    var dialog = Dialog(
-      title: 'adjust helix tick marks',
-      items: items,
-      disable_when_any_checkboxes_off: {
-        regular_spacing_distance_idx: [regular_spacing_checkbox_idx],
-        periodic_spacing_distances_idx: [periodic_spacing_checkbox_idx],
-        major_ticks_distances_idx: [major_ticks_checkbox_idx],
-      },
-      disable_when_any_checkboxes_on: {
-        major_tick_start_idx: [major_ticks_checkbox_idx],
-      },
-      mutually_exclusive_checkbox_groups: [
-        [regular_spacing_checkbox_idx, periodic_spacing_checkbox_idx, major_ticks_checkbox_idx],
-        [apply_to_all_idx, apply_to_some_idx],
-      ],
-    );
+    var dialog = Dialog(title: 'adjust helix tick marks', items: items, disable_when_any_checkboxes_off: {
+      regular_spacing_distance_idx: [regular_spacing_checkbox_idx],
+      periodic_spacing_distances_idx: [periodic_spacing_checkbox_idx],
+      major_ticks_distances_idx: [major_ticks_checkbox_idx],
+    }, disable_when_any_checkboxes_on: {
+      major_tick_start_idx: [major_ticks_checkbox_idx],
+    }, mutually_exclusive_checkbox_groups: [
+      [regular_spacing_checkbox_idx, periodic_spacing_checkbox_idx, major_ticks_checkbox_idx],
+      [apply_to_all_idx, apply_to_some_idx],
+    ]);
 
     List<DialogItem> results = await util.dialog(dialog);
     if (results == null) {

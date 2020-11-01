@@ -23,25 +23,48 @@ mixin DesignDialogFormProps on UiProps {
 
 @State()
 mixin DesignDialogFormState on UiState {
-  BuiltList<DialogItem> responses; // these are UPDATED as user changes form inputs
+  // these are UPDATED as user changes form inputs; they save responses *while the Dialog is open*,
+  // in between user interaction events such as typing in a field or selecting a radio button
+  BuiltList<DialogItem> responses;
+
+  // these save the responses when a certain dialog is used, *after the dialog closes*,
+  // so that they can be reused the next time the same dialog is opened
+  BuiltMap<String, BuiltList<DialogItem>> prev_responses;
 }
 
 class DesignDialogFormComponent extends UiStatefulComponent2<DesignDialogFormProps, DesignDialogFormState> {
   @override
+  Map get initialState => (newState()
+    ..responses = null
+    ..prev_responses = BuiltMap<String, BuiltList<DialogItem>>());
+
+  @override
   Map getDerivedStateFromProps(Map nextPropsUntyped, Map prevStateUntyped) {
     var new_props = typedPropsFactory(nextPropsUntyped);
+    BuiltList<DialogItem> prev_responses = null;
+    var prev_state = typedStateFactory(prevStateUntyped);
+    prev_responses = prev_state.prev_responses[new_props?.dialog?.prev_responses_key];
     if (new_props.dialog != null) {
-      var prev_state = typedStateFactory(prevStateUntyped);
-      if (prev_state.responses == null) {
-        return newState()..responses = new_props.dialog.items;
-      } else {
+      // If prev_state.responses != null, then this dialog is open and the user has edited at least once,
+      // so we use the previous state to populate the responses.
+      // Otherwise, it was just opened, so we either use the dialog object data,
+      // or state from the last time the dialog view was open.
+      if (prev_state.responses != null) {
         return prevStateUntyped;
+      } else {
+        // If dialog was just opened,
+        // use responses from last time this dialog was open if they exist,
+        // otherwise populate from default values in props.dialog
+        // Alternately, a particular dialog may explicitly override using prev_responses with
+        // override_prev_responses
+        bool use_prev_responses = prev_responses != null && new_props.dialog.use_prev_responses;
+        var responses = use_prev_responses? prev_responses: new_props.dialog.items;
+        return newState()..responses = responses;
       }
     } else {
-      //XXX: We cannot simply return null here. Must set responses to null in state, so the next time props
-      // are set (when a new dialog is created), we have a fresh dialog. Otherwise the old state persists
-      // and the dialog won't be refreshed for the new use.
-      return newState()..responses = null;
+      // use responses from last time this dialog was up if they exist
+      // (note will be null if no pre-existing dialog, which means responses == null, which is what we want)
+      return newState()..responses = prev_responses;
     }
   }
 
@@ -50,9 +73,6 @@ class DesignDialogFormComponent extends UiStatefulComponent2<DesignDialogFormPro
     if (props.dialog == null || state.responses == null) {
       return null;
     }
-
-    // var dialog = props.dialog;
-    // print(dialog);
 
     int component_idx = 0;
     List<ReactElement> components = [];
@@ -140,6 +160,15 @@ class DesignDialogFormComponent extends UiStatefulComponent2<DesignDialogFormPro
     props.dialog.on_submit(null);
   }
 
+  set_responses(ListBuilder<DialogItem> new_responses) {
+    var new_responses_built = new_responses.build();
+    var last_responses_builder = state.prev_responses.toBuilder();
+    last_responses_builder[props.dialog.prev_responses_key] = new_responses_built;
+    setState(newState()
+      ..responses = new_responses_built
+      ..prev_responses = last_responses_builder.build());
+  }
+
   ReactElement dialog_for(DialogItem item, int dialog_item_idx, bool disabled) {
     if (item is DialogCheckbox) {
       return Dom.label()(
@@ -166,7 +195,8 @@ class DesignDialogFormComponent extends UiStatefulComponent2<DesignDialogFormPro
                 }
               }
             }
-            setState(newState()..responses = new_responses.build());
+            set_responses(new_responses);
+            // setState(newState()..responses = new_responses.build());
           })(),
         item.label,
       );
@@ -178,13 +208,13 @@ class DesignDialogFormComponent extends UiStatefulComponent2<DesignDialogFormPro
           ..disabled = disabled
           ..value = item.value
           ..size = item.size
-//          ..width = '${item.size}ch'
           ..onChange = (SyntheticFormEvent e) {
             var new_responses = state.responses.toBuilder();
             String new_value = e.target.value;
             DialogText response = state.responses[dialog_item_idx];
             new_responses[dialog_item_idx] = response.rebuild((b) => b.value = new_value);
-            setState(newState()..responses = new_responses.build());
+            set_responses(new_responses);
+            // setState(newState()..responses = new_responses.build());
           })(),
       );
     } else if (item is DialogTextArea) {
@@ -201,7 +231,8 @@ class DesignDialogFormComponent extends UiStatefulComponent2<DesignDialogFormPro
             String new_value = e.target.value;
             DialogTextArea response = state.responses[dialog_item_idx];
             new_responses[dialog_item_idx] = response.rebuild((b) => b.value = new_value);
-            setState(newState()..responses = new_responses.build());
+            set_responses(new_responses);
+            // setState(newState()..responses = new_responses.build());
           })(),
       );
     } else if (item is DialogInteger) {
@@ -218,7 +249,8 @@ class DesignDialogFormComponent extends UiStatefulComponent2<DesignDialogFormPro
             if (new_value == null) return;
             DialogInteger response = state.responses[dialog_item_idx];
             new_responses[dialog_item_idx] = response.rebuild((b) => b.value = new_value);
-            setState(newState()..responses = new_responses.build());
+            set_responses(new_responses);
+            // setState(newState()..responses = new_responses.build());
           })(),
       );
     } else if (item is DialogFloat) {
@@ -236,7 +268,8 @@ class DesignDialogFormComponent extends UiStatefulComponent2<DesignDialogFormPro
             if (new_value == null) return;
             DialogFloat response = state.responses[dialog_item_idx];
             new_responses[dialog_item_idx] = response.rebuild((b) => b.value = new_value);
-            setState(newState()..responses = new_responses.build());
+            set_responses(new_responses);
+            // setState(newState()..responses = new_responses.build());
           })(),
       );
     } else if (item is DialogSelect) {
@@ -259,7 +292,8 @@ class DesignDialogFormComponent extends UiStatefulComponent2<DesignDialogFormPro
             DialogRadio response = state.responses[dialog_item_idx];
             var new_responses = state.responses.toBuilder();
             new_responses[dialog_item_idx] = response.rebuild((b) => b.selected_idx = selected_radio_idx);
-            setState(newState()..responses = new_responses.build());
+            set_responses(new_responses);
+            // setState(newState()..responses = new_responses.build());
           }
           ..key = '$radio_idx')());
         components.add((Dom.label()..key = 'label-$radio_idx')(option));
